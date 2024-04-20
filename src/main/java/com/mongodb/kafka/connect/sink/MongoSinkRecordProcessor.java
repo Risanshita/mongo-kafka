@@ -21,11 +21,14 @@ import static com.mongodb.kafka.connect.sink.MongoSinkTopicConfig.MAX_BATCH_SIZE
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.mongodb.MongoNamespace;
 import com.mongodb.kafka.connect.sink.dlq.ErrorReporter;
 
 final class MongoSinkRecordProcessor {
@@ -37,43 +40,38 @@ final class MongoSinkRecordProcessor {
       final ErrorReporter errorReporter) {
     LOGGER.debug("Number of sink records to process: {}", records.size());
 
-    List<List<MongoProcessedSinkRecordData>> orderedProcessedSinkRecordData = new ArrayList<>();
-    List<MongoProcessedSinkRecordData> currentGroup = new ArrayList<>();
-    MongoProcessedSinkRecordData previous = null;
+    List<MongoProcessedSinkRecordData> processedList = new ArrayList<>();
 
     for (SinkRecord record : records) {
-      MongoProcessedSinkRecordData processedData =
-          new MongoProcessedSinkRecordData(record, sinkConfig);
+      MongoProcessedSinkRecordData processedData = new MongoProcessedSinkRecordData(record, sinkConfig);
 
       if (processedData.getException() != null) {
         errorReporter.report(processedData.getSinkRecord(), processedData.getException());
         continue;
-      } else if (processedData.getNamespace() == null || processedData.getWriteModel() == null) {
+      } else if (processedData.getNamespace().getFullName() == null || processedData.getWriteModel() == null) {
         // Some CDC events can be Noops (eg tombstone events)
         continue;
       }
-
-      if (previous == null) {
-        previous = processedData;
-      }
-
-      int maxBatchSize = processedData.getConfig().getInt(MAX_BATCH_SIZE_CONFIG);
-      if (maxBatchSize > 0 && currentGroup.size() == maxBatchSize
-          || !previous.getSinkRecord().topic().equals(processedData.getSinkRecord().topic())
-          || !previous.getNamespace().equals(processedData.getNamespace())) {
-
-        orderedProcessedSinkRecordData.add(currentGroup);
-        currentGroup = new ArrayList<>();
-      }
-      previous = processedData;
-      currentGroup.add(processedData);
+      processedList.add(processedData);
     }
 
-    if (!currentGroup.isEmpty()) {
-      orderedProcessedSinkRecordData.add(currentGroup);
+    int maxBatchSize = sinkConfig.getInt(MAX_BATCH_SIZE_CONFIG);
+    Map<String, List<MongoProcessedSinkRecordData>> groupedData = processedList.stream()
+        .collect(Collectors.groupingBy(data -> data.getNamespace().getFullName()));
+
+    List<List<MongoProcessedSinkRecordData>> groupedLists = new ArrayList<>();
+
+    for (List<MongoProcessedSinkRecordData> dataForNamespace : groupedData.values()) {
+      // Split the data into chunks of maxBatchSize elements or less
+      for (int i = 0; i < dataForNamespace.size(); i += maxBatchSize) {
+        int endIndex = Math.min(i + maxBatchSize, dataForNamespace.size());
+        List<MongoProcessedSinkRecordData> chunk = dataForNamespace.subList(i, endIndex);
+        groupedLists.add(chunk);
+      }
     }
-    return orderedProcessedSinkRecordData;
+    return groupedLists;
   }
 
-  private MongoSinkRecordProcessor() {}
+  private MongoSinkRecordProcessor() {
+  }
 }
