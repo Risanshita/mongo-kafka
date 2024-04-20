@@ -32,46 +32,50 @@ import com.mongodb.MongoNamespace;
 import com.mongodb.kafka.connect.sink.dlq.ErrorReporter;
 
 final class MongoSinkRecordProcessor {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MongoSinkRecordProcessor.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(MongoSinkRecordProcessor.class);
 
-  static List<List<MongoProcessedSinkRecordData>> orderedGroupByTopicAndNamespace(
-      final Collection<SinkRecord> records,
-      final MongoSinkConfig sinkConfig,
-      final ErrorReporter errorReporter) {
-    LOGGER.debug("Number of sink records to process: {}", records.size());
+    static List<List<MongoProcessedSinkRecordData>> orderedGroupByTopicAndNamespace(
+            final Collection<SinkRecord> records,
+            final MongoSinkConfig sinkConfig,
+            final ErrorReporter errorReporter) {
+        LOGGER.debug("Number of sink records to process: {}", records.size());
 
-    List<MongoProcessedSinkRecordData> processedList = new ArrayList<>();
+        List<MongoProcessedSinkRecordData> processedList = new ArrayList<>();
 
-    for (SinkRecord record : records) {
-      MongoProcessedSinkRecordData processedData = new MongoProcessedSinkRecordData(record, sinkConfig);
+        for (SinkRecord record : records) {
+            MongoProcessedSinkRecordData processedData = new MongoProcessedSinkRecordData(record, sinkConfig);
 
-      if (processedData.getException() != null) {
-        errorReporter.report(processedData.getSinkRecord(), processedData.getException());
-        continue;
-      } else if (processedData.getNamespace().getFullName() == null || processedData.getWriteModel() == null) {
-        // Some CDC events can be Noops (eg tombstone events)
-        continue;
-      }
-      processedList.add(processedData);
+            if (processedData.getException() != null) {
+                errorReporter.report(processedData.getSinkRecord(), processedData.getException());
+                continue;
+            } else if (processedData.getNamespace().getFullName() == null || processedData.getWriteModel() == null) {
+                // Some CDC events can be Noops (eg tombstone events)
+                continue;
+            }
+            processedList.add(processedData);
+        }
+
+        int maxBatchSize = sinkConfig.getInt(MAX_BATCH_SIZE_CONFIG);
+        Map<String, List<MongoProcessedSinkRecordData>> groupedData = processedList.stream()
+                .collect(Collectors.groupingBy(data -> data.getNamespace().getFullName()));
+
+        List<List<MongoProcessedSinkRecordData>> groupedLists = new ArrayList<>();
+
+        if (maxBatchSize > 0) {
+            for (List<MongoProcessedSinkRecordData> dataForNamespace : groupedData.values()) {
+                // Split the data into chunks of maxBatchSize elements or less
+                for (int i = 0; i < dataForNamespace.size(); i += maxBatchSize) {
+                    int endIndex = Math.min(i + maxBatchSize, dataForNamespace.size());
+                    List<MongoProcessedSinkRecordData> chunk = dataForNamespace.subList(i, endIndex);
+                    groupedLists.add(chunk);
+                }
+            }
+        } else {
+            groupedLists.addAll(groupedData.values());
+        }
+        return groupedLists;
     }
 
-    int maxBatchSize = sinkConfig.getInt(MAX_BATCH_SIZE_CONFIG);
-    Map<String, List<MongoProcessedSinkRecordData>> groupedData = processedList.stream()
-        .collect(Collectors.groupingBy(data -> data.getNamespace().getFullName()));
-
-    List<List<MongoProcessedSinkRecordData>> groupedLists = new ArrayList<>();
-
-    for (List<MongoProcessedSinkRecordData> dataForNamespace : groupedData.values()) {
-      // Split the data into chunks of maxBatchSize elements or less
-      for (int i = 0; i < dataForNamespace.size(); i += maxBatchSize) {
-        int endIndex = Math.min(i + maxBatchSize, dataForNamespace.size());
-        List<MongoProcessedSinkRecordData> chunk = dataForNamespace.subList(i, endIndex);
-        groupedLists.add(chunk);
-      }
+    private MongoSinkRecordProcessor() {
     }
-    return groupedLists;
-  }
-
-  private MongoSinkRecordProcessor() {
-  }
 }
