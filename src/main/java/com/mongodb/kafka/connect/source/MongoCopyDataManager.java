@@ -59,12 +59,14 @@ import com.mongodb.kafka.connect.source.MongoSourceConfig.StartupConfig.CopyExis
  * Copy Data Manager
  *
  * <ol>
- *   <li>Gets all namespaces to copy. eg. A single collection, all collections in a database or all
- *       collections in all databases.
- *   <li>For each namespace, submit to the executors an copy existing task.
- *   <li>Each copy existing task, runs an aggregation pipeline on the namespace, to mimic an insert
- *       document and adds the results to the queue.
- *   <li>The poll method returns documents from the queue.
+ * <li>Gets all namespaces to copy. eg. A single collection, all collections in
+ * a database or all
+ * collections in all databases.
+ * <li>For each namespace, submit to the executors an copy existing task.
+ * <li>Each copy existing task, runs an aggregation pipeline on the namespace,
+ * to mimic an insert
+ * document and adds the results to the queue.
+ * <li>The poll method returns documents from the queue.
  * </ol>
  */
 class MongoCopyDataManager implements AutoCloseable {
@@ -73,23 +75,21 @@ class MongoCopyDataManager implements AutoCloseable {
   static final String ALT_NAMESPACE_FIELD = "__";
   private static final byte[] NAMESPACE_BYTES = NAMESPACE_FIELD.getBytes(StandardCharsets.UTF_8);
 
-  private static final String PIPELINE_TEMPLATE =
-      format(
-          "{$replaceRoot: "
-              + "{newRoot: {"
-              + "_id: {_id: '$_id', copyingData: true}, "
-              + "operationType: 'insert', "
-              + "%s: {db: '%%s', coll: '%%s'}"
-              + "documentKey: {_id: '$_id'}, "
-              + "fullDocument: '$$ROOT'}}"
-              + "}",
-          NAMESPACE_FIELD);
+  private static final String PIPELINE_TEMPLATE = format(
+      "{$replaceRoot: "
+          + "{newRoot: {"
+          + "_id: {_id: '$_id', copyingData: true}, "
+          + "operationType: 'insert', "
+          + "%s: {db: '%%s', coll: '%%s'}"
+          + "documentKey: {_id: '$_id'}, "
+          + "fullDocument: '$$ROOT'}}"
+          + "}",
+      NAMESPACE_FIELD);
 
-  private static final BsonDocument ADD_ALT_NAMESPACE_STAGE =
-      BsonDocument.parse(
-          format("{'$addFields': {'%s': '$%s'}}", ALT_NAMESPACE_FIELD, NAMESPACE_FIELD));
-  private static final BsonDocument UNSET_ORIGINAL_NAMESPACE_STAGE =
-      BsonDocument.parse(format("{'$project': {'%s': 0}}", NAMESPACE_FIELD));
+  private static final BsonDocument ADD_ALT_NAMESPACE_STAGE = BsonDocument.parse(
+      format("{'$addFields': {'%s': '$%s'}}", ALT_NAMESPACE_FIELD, NAMESPACE_FIELD));
+  private static final BsonDocument UNSET_ORIGINAL_NAMESPACE_STAGE = BsonDocument
+      .parse(format("{'$project': {'%s': 0}}", NAMESPACE_FIELD));
 
   private volatile boolean closed;
   private volatile Exception errorException;
@@ -109,9 +109,8 @@ class MongoCopyDataManager implements AutoCloseable {
     namespacesToCopy = new AtomicInteger(namespaces.size());
     CopyExistingConfig copyConfig = sourceConfig.getStartupConfig().copyExistingConfig();
     queue = new ArrayBlockingQueue<>(copyConfig.queueSize());
-    executor =
-        Executors.newFixedThreadPool(
-            Math.max(1, Math.min(namespaces.size(), copyConfig.maxThreads())));
+    executor = Executors.newFixedThreadPool(
+        Math.max(1, Math.min(namespaces.size(), copyConfig.maxThreads())));
     namespaces.forEach(n -> executor.submit(() -> copyDataFrom(n)));
   }
 
@@ -192,8 +191,7 @@ class MongoCopyDataManager implements AutoCloseable {
 
     if (!namespacesRegex.isEmpty()) {
       Predicate<String> predicate = Pattern.compile(namespacesRegex).asPredicate();
-      namespaces =
-          namespaces.stream().filter(n -> predicate.test(n.getFullName())).collect(toList());
+      namespaces = namespaces.stream().filter(n -> predicate.test(n.getFullName())).collect(toList());
     }
 
     return namespaces;
@@ -220,10 +218,9 @@ class MongoCopyDataManager implements AutoCloseable {
     }
 
     LOGGER.info("Copy exist MongoDB Pipeline Start for namespace: {}", namespace.getFullName());
-    pipeline.forEach(
-        (a) -> {
-          LOGGER.info("{}", a.toBsonDocument().toJson());
-        });
+    pipeline.forEach((a) -> {
+      LOGGER.info("{}", a.toBsonDocument().toJson());
+    });
     LOGGER.info("Copy exist MongoDB Pipeline End {}", namespace.getFullName());
     return pipeline;
   }
@@ -249,8 +246,7 @@ class MongoCopyDataManager implements AutoCloseable {
     return original;
   }
 
-  static BsonDocument convertDocumentV2(
-      final BsonDocument original, final MongoNamespace namespace) {
+  static BsonDocument convertDocumentV2(final BsonDocument original, final MongoNamespace namespace) {
     return convertToChangeStreamDocument(original, namespace);
   }
 
