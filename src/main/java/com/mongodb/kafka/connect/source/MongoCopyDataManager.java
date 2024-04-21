@@ -142,8 +142,7 @@ class MongoCopyDataManager implements AutoCloseable {
   }
 
   private void copyDataFrom(final MongoNamespace namespace) {
-    LOGGER.info(
-        "Copying existing data started from: {}", namespace.getFullName());
+    LOGGER.info("Copying existing data started from: {}", namespace.getFullName());
     try {
       AtomicLong totalGetFromSource = new AtomicLong();
       mongoClient
@@ -210,7 +209,7 @@ class MongoCopyDataManager implements AutoCloseable {
     return pipeline;
   }
 
-  static List<Bson> createPipelineV2(MongoSourceConfig cfg, MongoNamespace namespace) {
+  static List<Bson> createPipelineV2(final MongoSourceConfig cfg, final MongoNamespace namespace) {
     List<Bson> pipeline = new ArrayList<>();
     Optional<List<Document>> tempPipeline;
     if (cfg.getStartupConfig().copyExistingConfig().pipeline().isPresent()) {
@@ -220,12 +219,9 @@ class MongoCopyDataManager implements AutoCloseable {
 
     LOGGER.info("Copy exist MongoDB Pipeline Start for namespace: {}", namespace.getFullName());
     pipeline.forEach((a) -> {
-          LOGGER.info("{}", a.toBsonDocument().toJson());
-        });
-    LOGGER.info(
-        "Copy exist MongoDB Pipeline End {}",
-        namespace.getFullName(),
-        namespace.getCollectionName());
+      LOGGER.info("{}", a.toBsonDocument().toJson());
+    });
+    LOGGER.info("Copy exist MongoDB Pipeline End {}", namespace.getFullName());
     return pipeline;
   }
 
@@ -250,13 +246,12 @@ class MongoCopyDataManager implements AutoCloseable {
     return original;
   }
 
-  static BsonDocument convertDocumentV2(BsonDocument original, MongoNamespace namespace) {
-    original = convertToChangeStreamDocument(original, namespace);
-    return original;
+  static BsonDocument convertDocumentV2(final BsonDocument original, final MongoNamespace namespace) {
+    return convertToChangeStreamDocument(original, namespace);
   }
 
   public static BsonDocument convertToChangeStreamDocument(
-      BsonDocument original, MongoNamespace namespace) {
+      final BsonDocument original, final MongoNamespace namespace) {
     BsonDocument output = new BsonDocument();
     BsonValue id = original.get("_id", new BsonObjectId());
     output.append(
@@ -271,7 +266,7 @@ class MongoCopyDataManager implements AutoCloseable {
     return output;
   }
 
-  private void putToQueueV2(BsonDocument bsonDocument, MongoNamespace namespace) {
+  private void putToQueueV2(final BsonDocument bsonDocument, final MongoNamespace namespace) {
     try {
       this.queue.put(convertDocumentV2(bsonDocument, namespace));
     } catch (InterruptedException var4) {

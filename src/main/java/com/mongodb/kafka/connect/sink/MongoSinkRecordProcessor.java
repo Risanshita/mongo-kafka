@@ -28,7 +28,6 @@ import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.mongodb.MongoNamespace;
 import com.mongodb.kafka.connect.sink.dlq.ErrorReporter;
 
 final class MongoSinkRecordProcessor {
