@@ -42,14 +42,12 @@ final class MongoSinkRecordProcessor {
     List<MongoProcessedSinkRecordData> processedList = new ArrayList<>();
 
     for (SinkRecord record : records) {
-      MongoProcessedSinkRecordData processedData =
-          new MongoProcessedSinkRecordData(record, sinkConfig);
+      MongoProcessedSinkRecordData processedData = new MongoProcessedSinkRecordData(record, sinkConfig);
 
       if (processedData.getException() != null) {
         errorReporter.report(processedData.getSinkRecord(), processedData.getException());
         continue;
-      } else if (processedData.getNamespace().getFullName() == null
-          || processedData.getWriteModel() == null) {
+      } else if (processedData.getNamespace().getFullName() == null || processedData.getWriteModel() == null) {
         // Some CDC events can be Noops (eg tombstone events)
         continue;
       }
@@ -57,9 +55,8 @@ final class MongoSinkRecordProcessor {
     }
 
     int maxBatchSize = sinkConfig.getInt(MAX_BATCH_SIZE_CONFIG);
-    Map<String, List<MongoProcessedSinkRecordData>> groupedData =
-        processedList.stream()
-            .collect(Collectors.groupingBy(data -> data.getNamespace().getFullName()));
+    Map<String, List<MongoProcessedSinkRecordData>> groupedData = processedList.stream()
+        .collect(Collectors.groupingBy(data -> data.getNamespace().getFullName()));
 
     List<List<MongoProcessedSinkRecordData>> groupedLists = new ArrayList<>();
 
@@ -78,5 +75,6 @@ final class MongoSinkRecordProcessor {
     return groupedLists;
   }
 
-  private MongoSinkRecordProcessor() {}
+  private MongoSinkRecordProcessor() {
+  }
 }
